@@ -131,15 +131,3 @@ This project is for **educational and demo purposes**.
 Ensure image licensing terms are respected if used commercially.
 
 ---
-
-# 🧠 Future Improvements
-
-* Wings flap animation
-* Phoenix formed by particles
-* Fire burst on phoenix reveal
-* Background smoke effects
-* Interactive ember movement
-
----
-
-🔥 *From ashes, something new rises.*
