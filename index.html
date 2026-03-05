@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Phoenix Landing Page</title>
+<style>
+  body{margin:0;overflow:hidden;background:#000;font-family:Arial,Helvetica,sans-serif;color:#fff}
+  canvas{position:absolute;inset:0}
+  #aura{
+    position:absolute;top:55%;left:50%;transform:translate(-50%,-50%);
+    width:600px;height:600px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,120,0,0.35), rgba(255,80,0,0.15), transparent);
+    opacity:0;transition:2s;
+  }
+  #aura.show{opacity:1}
+  #phoenix{
+    position:absolute;top:55%;left:50%;
+    transform:translate(-50%,-50%) scale(0.4);
+    opacity:0;width:420px;transition:2s ease;
+    filter:drop-shadow(0 0 40px orange);
+    animation:float 5s ease-in-out infinite;
+  }
+  #phoenix.show{opacity:1;transform:translate(-50%,-60%) scale(1)}
+  @keyframes float{
+    0%{transform:translate(-50%,-60%) scale(1)}
+    50%{transform:translate(-50%,-63%) scale(1.02)}
+    100%{transform:translate(-50%,-60%) scale(1)}
+  }
+  #riseBtn{
+    position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+    padding:16px 40px;font-size:18px;font-weight:bold;border:none;border-radius:15px;
+    background:linear-gradient(45deg,#ff5a00,#ffb000);cursor:pointer;
+    opacity:0;transition:1s;box-shadow:0 0 30px rgba(255,120,0,0.8);
+  }
+  #riseBtn.show{opacity:1}
+  #message{
+    position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
+    font-size:28px;font-weight:bold;color:#ffb000;opacity:0;transition:1s;letter-spacing:2px;
+  }
+  #message.show{opacity:1}
+  #credit{
+    position:fixed;bottom:10px;right:15px;font-size:12px;color:#888
+  }
+  #credit a{color:#888;text-decoration:none}
+  #credit a:hover{color:#ffb000}
+</style>
+</head>
+<body>
+
+<canvas id="embers"></canvas>
+
+<div id="aura"></div>
+<img id="phoenix" src="phoenixred.png" alt="Phoenix" />
+
+<button id="riseBtn">Rise</button>
+<div id="message">Ready to soar</div>
+
+<div id="credit">
+  <a href="https://pngtree.com/freepng/flaming-red-phoenix_18970469.html" target="_blank" rel="noopener">
+    Image from pngtree.com
+  </a>
+</div>
+
+<script>
+  // ===== CONFIG =====
+  const DURATION_MS = 60000; // demo time for 1 min (set 900000 for 15 minutes)
+  const TOTAL_PARTICLES = 1400;
+  // ==================
+
+  const canvas = document.getElementById("embers");
+  const ctx = canvas.getContext("2d");
+
+  function resize(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Origin point where embers start (you can move this)
+  function originPoint(){
+    return { x: window.innerWidth * 0.5, y: window.innerHeight * 0.65 };
+  }
+
+  const particles = [];
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+
+  function initParticles(){
+    particles.length = 0;
+    const o = originPoint();
+
+    for(let i=0;i<TOTAL_PARTICLES;i++){
+      particles.push({
+        // all start at ONE point
+        x: o.x,
+        y: o.y,
+        // random velocity
+        vx: rand(-1.2, 1.2),
+        vy: rand(-2.8, -0.6),
+        size: rand(1, 3.5),
+        life: rand(0.2, 1),
+        // each particle gets a delay so spread feels gradual
+        delay: rand(0, 0.55), // fraction of duration
+        // random direction drift
+        drift: rand(-0.02, 0.02)
+      });
+    }
+  }
+  initParticles();
+
+  let start = performance.now();
+  let finished = false;
+
+  function easeOutCubic(p){ return 1 - Math.pow(1-p, 3); }
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+  function draw(tNow){
+    if(finished) return;
+
+    const t = tNow - start;
+    const p = clamp01(t / DURATION_MS);
+
+    // radius grows from 0 to full-screen diagonal (spread across whole screen)
+    const maxR = Math.hypot(window.innerWidth, window.innerHeight) * 0.55;
+    const spread = easeOutCubic(p) * maxR;
+
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+    // Draw particles
+    const o = originPoint();
+    for(const e of particles){
+      // particle starts later (delay)
+      const local = clamp01((p - e.delay) / (1 - e.delay + 1e-6));
+      if(local <= 0) continue;
+
+      // choose a target position on the screen within current spread radius
+      // (each particle has deterministic "target" based on its index-ish randomness)
+      // We'll generate a pseudo target per particle using its initial vx/vy.
+      const ang = Math.atan2(e.vy, e.vx) + (e.drift * 40);
+      const r = spread * local;
+
+      // move outward while also rising slightly (embers)
+      const x = o.x + Math.cos(ang) * r;
+      const y = o.y + Math.sin(ang) * r * 0.55 - (local * 180);
+
+      // fade & flicker
+      const alpha = Math.max(0, e.life * (1 - local*0.85));
+      const flick = 0.65 + 0.35*Math.sin((tNow*0.02) + (ang*10));
+
+      // warm ember color
+      ctx.fillStyle = `rgba(255, ${Math.floor(120 + 90*flick)}, 0, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, e.size * (0.7 + 0.6*flick), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    if(p < 1){
+      requestAnimationFrame(draw);
+    } else {
+      finish();
+    }
+  }
+
+  function finish(){
+    finished = true;
+
+    // Show phoenix + aura, then button
+    document.getElementById("phoenix").classList.add("show");
+    document.getElementById("aura").classList.add("show");
+
+    setTimeout(() => {
+      document.getElementById("riseBtn").classList.add("show");
+    }, 1800);
+  }
+
+  // Button replaces itself with text
+  document.getElementById("riseBtn").addEventListener("click", function(){
+    this.style.display = "none";
+    document.getElementById("message").classList.add("show");
+  });
+
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>
